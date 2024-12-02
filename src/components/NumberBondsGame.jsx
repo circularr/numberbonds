@@ -158,16 +158,16 @@ const SettingsPanel = React.memo(({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" 
       onClick={handleModalClick}
     >
       <div 
-        className="bg-white rounded-2xl max-w-md w-full mx-auto shadow-2xl transform transition-all"
+        className="bg-white rounded-2xl w-full max-w-md mx-auto shadow-2xl transform transition-all my-4"
         onClick={handleModalClick}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 rounded-t-2xl">
-          <h2 className="text-3xl font-bold text-white mb-2">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-4 sm:p-6 rounded-t-2xl">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
             {isIntro ? '👋 Welcome!' : '⚙️ Game Settings'}
           </h2>
           <p className="text-primary-100">
@@ -181,7 +181,7 @@ const SettingsPanel = React.memo(({
             <button
               key={tab.id}
               onClick={(e) => handleTabChange(tab.id, e)}
-              className={`flex-1 p-4 text-center transition-colors
+              className={`flex-1 p-3 sm:p-4 text-center transition-colors text-sm sm:text-base
                 ${activeTab === tab.id 
                   ? 'text-primary-600 border-b-2 border-primary-500 font-bold'
                   : 'text-gray-500 hover:text-primary-500'}`}
@@ -192,7 +192,7 @@ const SettingsPanel = React.memo(({
         </div>
 
         {/* Content */}
-        <div className="p-6" onClick={e => e.stopPropagation()}>
+        <div className="p-4 sm:p-6 max-h-[60vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
           {activeTab === 'name' && (
             <div className="space-y-4">
               <label className="block">
@@ -228,15 +228,15 @@ const SettingsPanel = React.memo(({
                   <button
                     key={preset.name}
                     onClick={(e) => handleDifficultySelect(preset, e)}
-                    className={`p-4 rounded-xl border-2 transition-all flex items-center
+                    className={`p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center
                       ${formData.settings.minNumber === preset.min && formData.settings.maxNumber === preset.max
                         ? 'border-primary-500 bg-primary-50 text-primary-700'
                         : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/50'}`}
                   >
-                    <span className="text-2xl mr-3">{preset.emoji}</span>
+                    <span className="text-xl sm:text-2xl mr-3">{preset.emoji}</span>
                     <div className="text-left">
-                      <div className="font-medium">{preset.name}</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="font-medium text-sm sm:text-base">{preset.name}</div>
+                      <div className="text-xs sm:text-sm text-gray-500">
                         Numbers from {preset.min} to {preset.max}
                       </div>
                     </div>
@@ -264,8 +264,8 @@ const SettingsPanel = React.memo(({
                           ? 'border-primary-500 bg-primary-50 text-primary-700'
                           : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/50'}`}
                     >
-                      <div className="text-2xl mb-1">{op.emoji}</div>
-                      <div className="font-medium">{op.label}</div>
+                      <div className="text-xl sm:text-2xl mb-1">{op.emoji}</div>
+                      <div className="font-medium text-sm sm:text-base">{op.label}</div>
                     </button>
                   ))}
                 </div>
@@ -295,12 +295,12 @@ const SettingsPanel = React.memo(({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-gray-50 rounded-b-2xl border-t flex justify-end gap-3">
+        <div className="p-4 sm:p-6 bg-gray-50 rounded-b-2xl border-t flex justify-end gap-3">
           {!isIntro && (
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100
-                       transition-colors text-gray-700"
+                       transition-colors text-gray-700 text-sm sm:text-base"
             >
               Cancel
             </button>
@@ -310,7 +310,7 @@ const SettingsPanel = React.memo(({
             disabled={!formData.name.trim()}
             className="px-6 py-2 rounded-lg bg-primary-500 text-white font-medium
                      hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed
-                     transition-colors"
+                     transition-colors text-sm sm:text-base"
           >
             {isIntro ? "Let's Play!" : 'Save Changes'}
           </button>
