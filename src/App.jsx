@@ -1,3 +1,5 @@
+// src/App.jsx
+
 import React from 'react';
 import NumberBondsGame from './components/NumberBondsGame';
 

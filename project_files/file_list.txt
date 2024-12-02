@@ -1,0 +1,17 @@
+=== File List ===
+./.gitignore
+./README.md
+./index.html
+./list_files.sh
+./package.json
+./postcss.config.js
+./src/App.jsx
+./src/components/BadgesDisplay.jsx
+./src/components/NumberBondsGame.jsx
+./src/components/SettingsPanel.jsx
+./src/constants/gameConstants.js
+./src/hooks/useSound.js
+./src/index.css
+./src/main.jsx
+./tailwind.config.js
+./vite.config.js
