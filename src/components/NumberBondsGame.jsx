@@ -1,6 +1,324 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, RotateCw } from 'lucide-react';
+import { Settings, RotateCw, Star, Zap, Trophy, Target, Compass } from 'lucide-react';
 import useSound from '../hooks/useSound';
+
+const BADGES = {
+  MATH_WHIZ: {
+    id: 'math-whiz',
+    name: 'Math Whiz',
+    description: 'Reached level 3',
+    icon: Star,
+    className: 'badge-math-whiz',
+    condition: (stats) => stats.level >= 3
+  },
+  SPEED_DEMON: {
+    id: 'speed-demon',
+    name: 'Speed Demon',
+    description: 'Completed 10 problems in under 30 seconds',
+    icon: Zap,
+    className: 'badge-speed-demon',
+    condition: (stats) => stats.fastSolves >= 10
+  },
+  PERSISTENT: {
+    id: 'persistent',
+    name: 'Persistent',
+    description: 'Played for 5 minutes straight',
+    icon: Target,
+    className: 'badge-persistent',
+    condition: (stats) => stats.playTime >= 300
+  },
+  PERFECTIONIST: {
+    id: 'perfectionist',
+    name: 'Perfectionist',
+    description: 'Got a streak of 10',
+    icon: Trophy,
+    className: 'badge-perfectionist',
+    condition: (stats) => stats.maxStreak >= 10
+  },
+  EXPLORER: {
+    id: 'explorer',
+    name: 'Explorer',
+    description: 'Tried both addition and multiplication',
+    icon: Compass,
+    className: 'badge-explorer',
+    condition: (stats) => stats.operationsUsed.size >= 2
+  }
+};
+
+const SettingsPanel = React.memo(({
+  onClose,
+  isIntro = false,
+  playerName,
+  setPlayerName,
+  gameSettings,
+  setGameSettings,
+  generateProblemsAndAnswers,
+}) => {
+  const [formData, setFormData] = React.useState({
+    name: playerName || '',
+    settings: { ...gameSettings }
+  });
+  const [error, setError] = React.useState('');
+  const [activeTab, setActiveTab] = React.useState('name');
+
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleNameChange = React.useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newName = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      name: newName
+    }));
+  }, []);
+
+  const handleDifficultySelect = React.useCallback((preset) => {
+    setFormData(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        minNumber: preset.min,
+        maxNumber: preset.max
+      }
+    }));
+    setError('');
+  }, []);
+
+  const handleOperationChange = React.useCallback((operation) => {
+    setFormData(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        operationType: operation
+      }
+    }));
+  }, []);
+
+  const handleProblemCountChange = React.useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const count = parseInt(e.target.value);
+    if (!isNaN(count) && count >= 2 && count <= 8) {
+      setFormData(prev => ({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          problemCount: count
+        }
+      }));
+    }
+  }, []);
+
+  const handleTabChange = React.useCallback((tabId, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setActiveTab(tabId);
+  }, []);
+
+  const handleSave = React.useCallback((e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const trimmedName = formData.name.trim();
+    if (trimmedName) {
+      setPlayerName(trimmedName);
+      setGameSettings(formData.settings);
+      localStorage.setItem('playerName', trimmedName);
+      Object.entries(formData.settings).forEach(([key, value]) => {
+        localStorage.setItem(key, value.toString());
+      });
+      onClose();
+      generateProblemsAndAnswers();
+    }
+  }, [formData, setPlayerName, setGameSettings, onClose, generateProblemsAndAnswers]);
+
+  const handleModalClick = React.useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  // Memoized tabs configuration
+  const tabs = React.useMemo(() => [
+    { id: 'name', label: '👤 Name', show: true },
+    { id: 'difficulty', label: '🎯 Difficulty', show: true },
+    { id: 'customize', label: '⚙️ Customize', show: true }
+  ], []);
+
+  // Memoized difficulty presets
+  const difficultyPresets = React.useMemo(() => [
+    { name: 'Beginner', min: 1, max: 5, emoji: '🌱' },
+    { name: 'Easy', min: 1, max: 10, emoji: '🌟' },
+    { name: 'Medium', min: 5, max: 15, emoji: '🚀' },
+    { name: 'Hard', min: 10, max: 20, emoji: '🔥' },
+    { name: 'Expert', min: 15, max: 30, emoji: '👑' }
+  ], []);
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+      onClick={handleModalClick}
+    >
+      <div 
+        className="bg-white rounded-2xl max-w-md w-full mx-auto shadow-2xl transform transition-all"
+        onClick={handleModalClick}
+      >
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 rounded-t-2xl">
+          <h2 className="text-3xl font-bold text-white mb-2">
+            {isIntro ? '👋 Welcome!' : '⚙️ Game Settings'}
+          </h2>
+          <p className="text-primary-100">
+            {isIntro ? "Let's set up your game" : 'Customize your experience'}
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b" onClick={(e) => e.stopPropagation()}>
+          {tabs.filter(tab => tab.show).map(tab => (
+            <button
+              key={tab.id}
+              onClick={(e) => handleTabChange(tab.id, e)}
+              className={`flex-1 p-4 text-center transition-colors
+                ${activeTab === tab.id 
+                  ? 'text-primary-600 border-b-2 border-primary-500 font-bold'
+                  : 'text-gray-500 hover:text-primary-500'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="p-6" onClick={e => e.stopPropagation()}>
+          {activeTab === 'name' && (
+            <div className="space-y-4">
+              <label className="block">
+                <span className="text-lg font-medium text-gray-700">What's your name?</span>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={handleNameChange}
+                  className="mt-2 w-full p-3 border-2 border-gray-200 rounded-xl 
+                           focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20
+                           text-lg transition-all"
+                  placeholder="Enter your name"
+                  autoComplete="off"
+                  maxLength={20}
+                />
+              </label>
+              {formData.name.trim() && (
+                <div className="animate-fade-in text-center">
+                  <span className="text-2xl">👋</span>
+                  <p className="text-primary-600 font-medium">
+                    Nice to meet you, {formData.name.trim()}!
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'difficulty' && (
+            <div className="space-y-4">
+              <p className="text-gray-600">Choose your difficulty level:</p>
+              <div className="grid grid-cols-1 gap-3">
+                {difficultyPresets.map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={(e) => handleDifficultySelect(preset, e)}
+                    className={`p-4 rounded-xl border-2 transition-all flex items-center
+                      ${formData.settings.minNumber === preset.min && formData.settings.maxNumber === preset.max
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/50'}`}
+                  >
+                    <span className="text-2xl mr-3">{preset.emoji}</span>
+                    <div className="text-left">
+                      <div className="font-medium">{preset.name}</div>
+                      <div className="text-sm text-gray-500">
+                        Numbers from {preset.min} to {preset.max}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'customize' && (
+            <div className="space-y-6">
+              {/* Operation Type */}
+              <div>
+                <label className="text-gray-700 font-medium">Operation</label>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  {[
+                    { value: 'addition', label: 'Addition', emoji: '➕' },
+                    { value: 'multiplication', label: 'Multiplication', emoji: '✖️' }
+                  ].map(op => (
+                    <button
+                      key={op.value}
+                      onClick={(e) => handleOperationChange(op.value, e)}
+                      className={`p-3 rounded-xl border-2 transition-all text-center
+                        ${formData.settings.operationType === op.value
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/50'}`}
+                    >
+                      <div className="text-2xl mb-1">{op.emoji}</div>
+                      <div className="font-medium">{op.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Problem Count */}
+              <div>
+                <label className="text-gray-700 font-medium">
+                  Number of Problems: {formData.settings.problemCount}
+                </label>
+                <input
+                  type="range"
+                  min="2"
+                  max="8"
+                  step="1"
+                  value={formData.settings.problemCount}
+                  onChange={handleProblemCountChange}
+                  className="w-full mt-2 accent-primary-500 cursor-pointer"
+                />
+                <div className="flex justify-between text-sm text-gray-500 mt-1">
+                  <span>2</span>
+                  <span>8</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 bg-gray-50 rounded-b-2xl border-t flex justify-end gap-3">
+          {!isIntro && (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100
+                       transition-colors text-gray-700"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={!formData.name.trim()}
+            className="px-6 py-2 rounded-lg bg-primary-500 text-white font-medium
+                     hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed
+                     transition-colors"
+          >
+            {isIntro ? "Let's Play!" : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const NumberBondsGame = () => {
   // Game state
@@ -32,6 +350,20 @@ const NumberBondsGame = () => {
 
   // Sound effects
   const { playSound, playSuccessSound, playWrongSound, playStreakSound } = useSound();
+
+  // Add new state for badges and stats
+  const [earnedBadges, setEarnedBadges] = useState(() => {
+    const saved = localStorage.getItem('earnedBadges');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newBadge, setNewBadge] = useState(null);
+  const [gameStats, setGameStats] = useState(() => ({
+    level: 1,
+    fastSolves: 0,
+    playTime: 0,
+    maxStreak: 0,
+    operationsUsed: new Set([gameSettings.operationType])
+  }));
 
   const createParticles = (x, y, isStreak = false) => {
     const container = document.createElement('div');
@@ -149,202 +481,6 @@ const NumberBondsGame = () => {
     }, 3000);
   };
 
-  // Settings Panel Component
-  const SettingsPanel = ({
-    onClose,
-    isIntro = false,
-    playerName,
-    setPlayerName,
-    gameSettings,
-    setGameSettings,
-    generateProblemsAndAnswers,
-  }) => {
-    const [tempName, setTempName] = useState(playerName);
-    const [tempSettings, setTempSettings] = useState(gameSettings);
-    const [error, setError] = useState('');
-
-    // Handle number range changes with validation
-    const handleRangeChange = (field, value) => {
-      const numValue = parseInt(value) || 0;
-      
-      setTempSettings(prev => {
-        const newSettings = { ...prev };
-        
-        if (field === 'minNumber') {
-          // Ensure min is not greater than max
-          newSettings.minNumber = Math.max(1, Math.min(numValue, prev.maxNumber - 1));
-        } else if (field === 'maxNumber') {
-          // Ensure max is not less than min
-          newSettings.maxNumber = Math.max(prev.minNumber + 1, numValue);
-        }
-
-        // Validate the range
-        if (newSettings.maxNumber - newSettings.minNumber < 2) {
-          setError('Range must be at least 2 numbers');
-        } else if (newSettings.maxNumber > 100) {
-          setError('Maximum number cannot exceed 100');
-        } else if (newSettings.minNumber < 1) {
-          setError('Minimum number cannot be less than 1');
-        } else {
-          setError('');
-        }
-
-        return newSettings;
-      });
-    };
-
-    // Preset ranges for quick selection
-    const presetRanges = [
-      { label: 'Easy (1-5)', min: 1, max: 5 },
-      { label: 'Medium (1-10)', min: 1, max: 10 },
-      { label: 'Hard (1-20)', min: 1, max: 20 },
-      { label: 'Expert (10-50)', min: 10, max: 50 },
-    ];
-
-    const handleSave = () => {
-      if (tempName.trim() && !error) {
-        setPlayerName(tempName);
-        setGameSettings(tempSettings);
-        localStorage.setItem('playerName', tempName);
-        localStorage.setItem('minNumber', tempSettings.minNumber.toString());
-        localStorage.setItem('maxNumber', tempSettings.maxNumber.toString());
-        localStorage.setItem('problemCount', tempSettings.problemCount.toString());
-        localStorage.setItem('operationType', tempSettings.operationType);
-        onClose();
-        generateProblemsAndAnswers();
-      }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-          <h2 className="text-2xl font-bold mb-4">{isIntro ? 'Welcome!' : 'Game Settings'}</h2>
-          
-          {/* Name Input */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-1">Your Name</label>
-            <input
-              type="text"
-              value={tempName}
-              onChange={(e) => setTempName(e.target.value)}
-              className="w-full p-2 border rounded-lg"
-              placeholder="Enter your name"
-            />
-          </div>
-
-          {/* Operation Type */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-1">Operation Type</label>
-            <select
-              value={tempSettings.operationType}
-              onChange={(e) => setTempSettings(prev => ({
-                ...prev,
-                operationType: e.target.value
-              }))}
-              className="w-full p-2 border rounded-lg"
-            >
-              <option value="addition">Addition (+)</option>
-              <option value="multiplication">Multiplication (×)</option>
-            </select>
-          </div>
-
-          {/* Preset Number Ranges */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Quick Range Select</label>
-            <div className="grid grid-cols-2 gap-2">
-              {presetRanges.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => setTempSettings(prev => ({
-                    ...prev,
-                    minNumber: preset.min,
-                    maxNumber: preset.max
-                  }))}
-                  className="p-2 text-sm border rounded-lg hover:bg-primary-50 transition-colors"
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Number Range */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Custom Number Range</label>
-            <div className="flex gap-4 items-center">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Min</label>
-                <input
-                  type="number"
-                  min="1"
-                  max={tempSettings.maxNumber - 1}
-                  value={tempSettings.minNumber}
-                  onChange={(e) => handleRangeChange('minNumber', e.target.value)}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Max</label>
-                <input
-                  type="number"
-                  min={tempSettings.minNumber + 1}
-                  max="100"
-                  value={tempSettings.maxNumber}
-                  onChange={(e) => handleRangeChange('maxNumber', e.target.value)}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-            </div>
-            {error && (
-              <p className="text-red-500 text-sm mt-1">{error}</p>
-            )}
-          </div>
-
-          {/* Problem Count */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-1">
-              Number of Problems
-              <span className="text-gray-500 text-xs ml-2">(2-8)</span>
-            </label>
-            <input
-              type="range"
-              min="2"
-              max="8"
-              value={tempSettings.problemCount}
-              onChange={(e) => setTempSettings(prev => ({
-                ...prev,
-                problemCount: parseInt(e.target.value)
-              }))}
-              className="w-full"
-            />
-            <div className="text-center text-sm text-gray-600">
-              {tempSettings.problemCount} problems
-            </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex justify-end gap-2">
-            {!isIntro && (
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-            )}
-            <button
-              onClick={handleSave}
-              disabled={!tempName.trim() || error}
-              className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
-            >
-              {isIntro ? 'Start Game' : 'Save Changes'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // Handle problem selection
   const handleProblemClick = (problem) => {
     playSound(440, 'sine', 0.2, 0.1);
@@ -430,8 +566,88 @@ const NumberBondsGame = () => {
   }, [selectedProblem, selectedAnswer, problems.length, multiplier, 
       playSuccessSound, playWrongSound, playStreakSound, generateProblemsAndAnswers, removeItems]);
 
+  // Update play time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setGameStats(prev => ({
+        ...prev,
+        playTime: prev.playTime + 1
+      }));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Check for new badges
+  const checkBadges = useCallback(() => {
+    Object.values(BADGES).forEach(badge => {
+      if (!earnedBadges.includes(badge.id) && badge.condition(gameStats)) {
+        setEarnedBadges(prev => {
+          const newBadges = [...prev, badge.id];
+          localStorage.setItem('earnedBadges', JSON.stringify(newBadges));
+          return newBadges;
+        });
+        setNewBadge(badge);
+        playStreakSound();
+        setTimeout(() => setNewBadge(null), 3000);
+      }
+    });
+  }, [earnedBadges, gameStats, playStreakSound]);
+
+  // Update stats when game state changes
+  useEffect(() => {
+    setGameStats(prev => {
+      const newStats = {
+        ...prev,
+        level: Math.floor(streak / 5) + 1,
+        maxStreak: Math.max(prev.maxStreak, streak),
+        operationsUsed: new Set([...prev.operationsUsed, gameSettings.operationType])
+      };
+      return newStats;
+    });
+  }, [streak, gameSettings.operationType]);
+
+  // Check badges when stats change
+  useEffect(() => {
+    checkBadges();
+  }, [gameStats, checkBadges]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 p-4">
+      {/* Badges Display */}
+      <div className="badges-container">
+        {earnedBadges.map(badgeId => {
+          const badge = Object.values(BADGES).find(b => b.id === badgeId);
+          if (!badge) return null;
+          const Icon = badge.icon;
+          return (
+            <div
+              key={badge.id}
+              className={`badge ${badge.className} ${newBadge?.id === badge.id ? 'badge-new' : ''}`}
+            >
+              <Icon className="badge-icon" />
+              {badge.name}
+              <span className="badge-tooltip">{badge.description}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* New Badge Celebration */}
+      {newBadge && (
+        <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+          <div className="text-center">
+            <div className={`badge ${newBadge.className} badge-new scale-150 mb-4`}>
+              <newBadge.icon className="badge-icon w-8 h-8" />
+              {newBadge.name}
+            </div>
+            <div className="text-2xl font-bold text-white shadow-text">
+              New Badge Unlocked!
+            </div>
+          </div>
+        </div>
+      )}
+
       {showLevelUp && (
         <div className="level-up-text">
           Level Up! 🎉

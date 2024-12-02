@@ -100,6 +100,53 @@
     animation: level-up-appear 1.5s ease-out forwards;
     text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
   }
+
+  .badges-container {
+    @apply fixed top-4 right-4 flex flex-col gap-2 z-50;
+  }
+
+  .badge {
+    @apply flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-bold
+           shadow-lg backdrop-blur-sm transform transition-all duration-300
+           hover:scale-110 cursor-help;
+  }
+
+  .badge-icon {
+    @apply w-6 h-6 animate-pulse;
+  }
+
+  .badge-new {
+    animation: badge-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .badge-math-whiz {
+    @apply bg-gradient-to-r from-blue-500 to-purple-500;
+  }
+
+  .badge-speed-demon {
+    @apply bg-gradient-to-r from-red-500 to-orange-500;
+  }
+
+  .badge-persistent {
+    @apply bg-gradient-to-r from-green-500 to-emerald-500;
+  }
+
+  .badge-perfectionist {
+    @apply bg-gradient-to-r from-yellow-500 to-amber-500;
+  }
+
+  .badge-explorer {
+    @apply bg-gradient-to-r from-pink-500 to-rose-500;
+  }
+
+  .badge-tooltip {
+    @apply absolute right-full mr-2 px-3 py-1 bg-black/80 text-white text-xs rounded
+           whitespace-nowrap opacity-0 transition-opacity duration-200;
+  }
+
+  .badge:hover .badge-tooltip {
+    @apply opacity-100;
+  }
 }
 
 @keyframes particle-float {
@@ -251,5 +298,22 @@
   100% {
     transform: translate(-50%, -50%) scale(1.5);
     opacity: 0;
+  }
+}
+
+@keyframes badge-pop {
+  0% {
+    transform: scale(0) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(5deg);
+  }
+  75% {
+    transform: scale(0.9) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
   }
 }
