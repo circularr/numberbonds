@@ -1,193 +1,37 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Crown, Volume2, RotateCw } from 'lucide-react';
+import { Settings, RotateCw } from 'lucide-react';
+import useSound from '../hooks/useSound';
 
 const NumberBondsGame = () => {
+  // Game state
   const [problems, setProblems] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
-  const [audioContext, setAudioContext] = useState(null);
   const [removingItems, setRemovingItems] = useState(new Set());
-  const [streak, setStreak] = useState(0);
+
+  // Player and game settings
+  const [playerName, setPlayerName] = useState(localStorage.getItem('playerName') || '');
+  const [gameSettings, setGameSettings] = useState({
+    minNumber: parseInt(localStorage.getItem('minNumber')) || 1,
+    maxNumber: parseInt(localStorage.getItem('maxNumber')) || 10,
+    problemCount: parseInt(localStorage.getItem('problemCount')) || 4,
+    operationType: localStorage.getItem('operationType') || 'addition',
+  });
+
+  // UI state
+  const [showSettings, setShowSettings] = useState(false);
+  const [showIntroModal, setShowIntroModal] = useState(!localStorage.getItem('playerName'));
   const [showStreakAnimation, setShowStreakAnimation] = useState(false);
-  const [level, setLevel] = useState(1);
-  const [successCount, setSuccessCount] = useState(0);
+  const [showLevelUp, setShowLevelUp] = useState(false);
 
-  useEffect(() => {
-    const context = new (window.AudioContext || window.webkitAudioContext)();
-    setAudioContext(context);
+  // Score and streak
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [multiplier, setMultiplier] = useState(1);
 
-    const savedHighScore = localStorage.getItem('numberBondsHighScore');
-    if (savedHighScore) {
-      setHighScore(parseInt(savedHighScore));
-    }
-
-    generateProblemsAndAnswers();
-  }, []);
-
-  const generateProblemsAndAnswers = () => {
-    let newProblems = [];
-    let newAnswers = [];
-    
-    // Level 1: Only 2+2 = 4 (super easy start)
-    if (level === 1) {
-      newProblems.push({ 
-        id: Math.random(), 
-        first: 2,
-        second: 2,
-        sum: 4,
-        isCorrect: true
-      });
-      // Add corresponding answer
-      newAnswers.push({ id: Math.random(), value: 4 });
-    }
-    // Level 2: Add 1+3 and 3+1 = 4
-    else if (level === 2) {
-      const pairs = [
-        [1, 3],
-        [2, 2],
-        [3, 1]
-      ];
-      pairs.forEach(([a, b]) => {
-        newProblems.push({ 
-          id: Math.random(), 
-          first: a,
-          second: b,
-          sum: 4,
-          isCorrect: true
-        });
-      });
-      // Add corresponding answers
-      for (let i = 0; i < pairs.length; i++) {
-        newAnswers.push({ id: Math.random(), value: 4 });
-      }
-    }
-    // Level 3: All combinations that make 4
-    else if (level === 3) {
-      for (let i = 0; i <= 4; i++) {
-        newProblems.push({ 
-          id: Math.random(), 
-          first: i,
-          second: 4 - i,
-          sum: 4,
-          isCorrect: true
-        });
-        newAnswers.push({ id: Math.random(), value: 4 });
-      }
-    }
-    // Level 4+: Start introducing pairs that make 5
-    else {
-      // All pairs that make 4
-      for (let i = 0; i <= 4; i++) {
-        newProblems.push({ 
-          id: Math.random(), 
-          first: i,
-          second: 4 - i,
-          sum: 4,
-          isCorrect: true
-        });
-        newAnswers.push({ id: Math.random(), value: 4 });
-      }
-      
-      // Add pairs that make 5 (increasing with level)
-      const numFivePairs = Math.min(Math.floor((level - 3) * 1.5), 6); // Add more pairs as level increases
-      const fivePairs = [];
-      for (let i = 0; i <= 5; i++) {
-        fivePairs.push([i, 5 - i]);
-      }
-      
-      // Shuffle and take some pairs
-      const selectedFivePairs = fivePairs
-        .sort(() => Math.random() - 0.5)
-        .slice(0, numFivePairs);
-      
-      selectedFivePairs.forEach(([a, b]) => {
-        newProblems.push({ 
-          id: Math.random(), 
-          first: a,
-          second: b,
-          sum: 5,
-          isCorrect: true
-        });
-        newAnswers.push({ id: Math.random(), value: 5 });
-      });
-    }
-
-    // Add a few extra answers for both 4 and 5 to make it more interesting
-    if (level >= 4) {
-      const extraFours = 2;
-      const extraFives = 2;
-      for (let i = 0; i < extraFours; i++) {
-        newAnswers.push({ id: Math.random(), value: 4 });
-      }
-      for (let i = 0; i < extraFives; i++) {
-        newAnswers.push({ id: Math.random(), value: 5 });
-      }
-    }
-
-    // Shuffle both arrays
-    newProblems = newProblems.sort(() => Math.random() - 0.5);
-    newAnswers = newAnswers.sort(() => Math.random() - 0.5);
-
-    setProblems(newProblems);
-    setAnswers(newAnswers);
-  };
-
-  const resetGame = () => {
-    setScore(0);
-    setStreak(0);
-    setLevel(1);
-    setSuccessCount(0);
-    generateProblemsAndAnswers();
-    localStorage.setItem('numberBondsScore', '0');
-    playSound(330, 'sawtooth', 0.3);
-  };
-
-  const playSound = (frequency, type = 'sine', volume = 0.5, duration = 0.5) => {
-    if (!audioContext) return;
-
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-
-    if (type === 'square') {
-      // For correct matches, add a quick pitch bend up
-      oscillator.frequency.linearRampToValueAtTime(frequency * 1.2, audioContext.currentTime + 0.1);
-    }
-
-    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + duration);
-  };
-
-  const playSuccessSound = () => {
-    // Play a series of ascending notes for success
-    const baseFreq = 440;
-    [0, 0.1, 0.2].forEach((delay, i) => {
-      setTimeout(() => {
-        playSound(baseFreq * Math.pow(1.2, i), 'square', 0.3, 0.2);
-      }, delay * 1000);
-    });
-  };
-
-  const playStreakSound = () => {
-    // Play a special sound for streaks
-    const baseFreq = 880;
-    [0, 0.1, 0.2, 0.3].forEach((delay, i) => {
-      setTimeout(() => {
-        playSound(baseFreq * Math.pow(1.2, i), 'square', 0.2, 0.15);
-      }, delay * 1000);
-    });
-  };
+  // Sound effects
+  const { playSound, playSuccessSound, playWrongSound, playStreakSound } = useSound();
 
   const createParticles = (x, y, isStreak = false) => {
     const container = document.createElement('div');
@@ -206,35 +50,314 @@ const NumberBondsGame = () => {
     
     for (let i = 0; i < particleCount; i++) {
       const particle = document.createElement('div');
-      particle.style.position = 'absolute';
-      particle.style.width = isStreak ? '15px' : '12px';
-      particle.style.height = isStreak ? '15px' : '12px';
+      particle.className = 'particle';
       particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-      particle.style.borderRadius = '50%';
-      particle.style.animation = isStreak ? 'particle-fade 0.8s ease-out forwards' : 'particle-fade 0.5s ease-out forwards';
-      particle.style.transform = `rotate(${Math.random() * 360}deg)`;
+      particle.style.setProperty('--tx', `${(Math.random() - 0.5) * 200}px`);
+      particle.style.setProperty('--ty', `${(Math.random() - 0.7) * 200}px`);
       container.appendChild(particle);
     }
 
     setTimeout(() => {
       document.body.removeChild(container);
-    }, isStreak ? 1500 : 1000);
+    }, 1000);
   };
 
-  const handleSelection = (item, type) => {
-    if (removingItems.has(item.id)) return;
+  // Generate problems based on operation type
+  const generateProblem = useCallback(() => {
+    const { minNumber, maxNumber, operationType } = gameSettings;
     
-    playSound(type === 'problem' ? 440 : 520);
-
-    if (type === 'problem') {
-      setSelectedProblem(selectedProblem?.id === item.id ? null : item);
-      setSelectedAnswer(null);
-    } else {
-      setSelectedAnswer(selectedAnswer?.id === item.id ? null : item);
-      setSelectedProblem(selectedProblem);
+    if (operationType === 'addition') {
+      const sum = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
+      const part1 = Math.floor(Math.random() * (sum - minNumber)) + minNumber;
+      const part2 = sum - part1;
+      return { parts: [part1, part2], result: sum, operation: '+' };
+    } else { // multiplication
+      const num1 = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
+      const num2 = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
+      return { parts: [num1, num2], result: num1 * num2, operation: '×' };
     }
+  }, [gameSettings]);
+
+  // Generate problems and answers
+  const generateProblemsAndAnswers = useCallback(() => {
+    const newProblems = [];
+    const answersSet = new Set();
+    const { problemCount } = gameSettings;
+
+    while (newProblems.length < problemCount) {
+      const problem = generateProblem();
+      if (!answersSet.has(problem.result)) {
+        newProblems.push({
+          id: Math.random().toString(36).substr(2, 9),
+          ...problem
+        });
+        answersSet.add(problem.result);
+      }
+    }
+
+    const shuffledAnswers = Array.from(answersSet)
+      .map(value => ({ id: Math.random().toString(36).substr(2, 9), value }))
+      .sort(() => Math.random() - 0.5);
+
+    setProblems(newProblems);
+    setAnswers(shuffledAnswers);
+  }, [gameSettings, generateProblem]);
+
+  // Initialize game
+  useEffect(() => {
+    if (!showIntroModal) {
+      generateProblemsAndAnswers();
+    }
+  }, [generateProblemsAndAnswers, showIntroModal]);
+
+  // Celebration effect function
+  const createCelebration = () => {
+    const container = document.createElement('div');
+    container.className = 'celebration-container';
+    document.body.appendChild(container);
+
+    // Create confetti
+    const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD'];
+    for (let i = 0; i < 50; i++) {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti';
+      confetti.style.backgroundColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+      confetti.style.left = Math.random() * 100 + 'vw';
+      confetti.style.animationDelay = Math.random() * 2 + 's';
+      container.appendChild(confetti);
+    }
+
+    // Create shooting stars
+    for (let i = 0; i < 20; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.left = Math.random() * 100 + 'vw';
+      star.style.top = Math.random() * 100 + 'vh';
+      star.style.setProperty('--tx', (Math.random() - 0.5) * 300 + 'px');
+      star.style.setProperty('--ty', (Math.random() - 0.5) * 300 + 'px');
+      star.style.animationDelay = Math.random() * 0.5 + 's';
+      container.appendChild(star);
+    }
+
+    // Show level up text
+    setShowLevelUp(true);
+    setTimeout(() => setShowLevelUp(false), 1500);
+
+    // Clean up
+    setTimeout(() => {
+      document.body.removeChild(container);
+    }, 3000);
   };
 
+  // Settings Panel Component
+  const SettingsPanel = ({
+    onClose,
+    isIntro = false,
+    playerName,
+    setPlayerName,
+    gameSettings,
+    setGameSettings,
+    generateProblemsAndAnswers,
+  }) => {
+    const [tempName, setTempName] = useState(playerName);
+    const [tempSettings, setTempSettings] = useState(gameSettings);
+    const [error, setError] = useState('');
+
+    // Handle number range changes with validation
+    const handleRangeChange = (field, value) => {
+      const numValue = parseInt(value) || 0;
+      
+      setTempSettings(prev => {
+        const newSettings = { ...prev };
+        
+        if (field === 'minNumber') {
+          // Ensure min is not greater than max
+          newSettings.minNumber = Math.max(1, Math.min(numValue, prev.maxNumber - 1));
+        } else if (field === 'maxNumber') {
+          // Ensure max is not less than min
+          newSettings.maxNumber = Math.max(prev.minNumber + 1, numValue);
+        }
+
+        // Validate the range
+        if (newSettings.maxNumber - newSettings.minNumber < 2) {
+          setError('Range must be at least 2 numbers');
+        } else if (newSettings.maxNumber > 100) {
+          setError('Maximum number cannot exceed 100');
+        } else if (newSettings.minNumber < 1) {
+          setError('Minimum number cannot be less than 1');
+        } else {
+          setError('');
+        }
+
+        return newSettings;
+      });
+    };
+
+    // Preset ranges for quick selection
+    const presetRanges = [
+      { label: 'Easy (1-5)', min: 1, max: 5 },
+      { label: 'Medium (1-10)', min: 1, max: 10 },
+      { label: 'Hard (1-20)', min: 1, max: 20 },
+      { label: 'Expert (10-50)', min: 10, max: 50 },
+    ];
+
+    const handleSave = () => {
+      if (tempName.trim() && !error) {
+        setPlayerName(tempName);
+        setGameSettings(tempSettings);
+        localStorage.setItem('playerName', tempName);
+        localStorage.setItem('minNumber', tempSettings.minNumber.toString());
+        localStorage.setItem('maxNumber', tempSettings.maxNumber.toString());
+        localStorage.setItem('problemCount', tempSettings.problemCount.toString());
+        localStorage.setItem('operationType', tempSettings.operationType);
+        onClose();
+        generateProblemsAndAnswers();
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+          <h2 className="text-2xl font-bold mb-4">{isIntro ? 'Welcome!' : 'Game Settings'}</h2>
+          
+          {/* Name Input */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-1">Your Name</label>
+            <input
+              type="text"
+              value={tempName}
+              onChange={(e) => setTempName(e.target.value)}
+              className="w-full p-2 border rounded-lg"
+              placeholder="Enter your name"
+            />
+          </div>
+
+          {/* Operation Type */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-1">Operation Type</label>
+            <select
+              value={tempSettings.operationType}
+              onChange={(e) => setTempSettings(prev => ({
+                ...prev,
+                operationType: e.target.value
+              }))}
+              className="w-full p-2 border rounded-lg"
+            >
+              <option value="addition">Addition (+)</option>
+              <option value="multiplication">Multiplication (×)</option>
+            </select>
+          </div>
+
+          {/* Preset Number Ranges */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">Quick Range Select</label>
+            <div className="grid grid-cols-2 gap-2">
+              {presetRanges.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => setTempSettings(prev => ({
+                    ...prev,
+                    minNumber: preset.min,
+                    maxNumber: preset.max
+                  }))}
+                  className="p-2 text-sm border rounded-lg hover:bg-primary-50 transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Number Range */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">Custom Number Range</label>
+            <div className="flex gap-4 items-center">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">Min</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={tempSettings.maxNumber - 1}
+                  value={tempSettings.minNumber}
+                  onChange={(e) => handleRangeChange('minNumber', e.target.value)}
+                  className="w-full p-2 border rounded-lg"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">Max</label>
+                <input
+                  type="number"
+                  min={tempSettings.minNumber + 1}
+                  max="100"
+                  value={tempSettings.maxNumber}
+                  onChange={(e) => handleRangeChange('maxNumber', e.target.value)}
+                  className="w-full p-2 border rounded-lg"
+                />
+              </div>
+            </div>
+            {error && (
+              <p className="text-red-500 text-sm mt-1">{error}</p>
+            )}
+          </div>
+
+          {/* Problem Count */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-1">
+              Number of Problems
+              <span className="text-gray-500 text-xs ml-2">(2-8)</span>
+            </label>
+            <input
+              type="range"
+              min="2"
+              max="8"
+              value={tempSettings.problemCount}
+              onChange={(e) => setTempSettings(prev => ({
+                ...prev,
+                problemCount: parseInt(e.target.value)
+              }))}
+              className="w-full"
+            />
+            <div className="text-center text-sm text-gray-600">
+              {tempSettings.problemCount} problems
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-2">
+            {!isIntro && (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={!tempName.trim() || error}
+              className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+            >
+              {isIntro ? 'Start Game' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Handle problem selection
+  const handleProblemClick = (problem) => {
+    playSound(440, 'sine', 0.2, 0.1);
+    setSelectedProblem(prev => prev?.id === problem.id ? null : problem);
+  };
+
+  // Handle answer selection
+  const handleAnswerClick = (answer) => {
+    playSound(520, 'sine', 0.2, 0.1);
+    setSelectedAnswer(prev => prev?.id === answer.id ? null : answer);
+  };
+
+  // Remove matched items with animation
   const removeItems = useCallback((problemId, answerId) => {
     setRemovingItems(prev => new Set([...prev, problemId, answerId]));
     
@@ -250,207 +373,154 @@ const NumberBondsGame = () => {
     }, 500);
   }, []);
 
-  const checkLevelProgress = useCallback(() => {
-    setSuccessCount(prev => {
-      const newCount = prev + 1;
-      // Level up after certain number of successful matches
-      if (level === 1 && newCount >= 2) {  // Very quick progress from level 1
-        setLevel(2);
-        return 0;
-      } else if (level === 2 && newCount >= 4) {  // Need more success at level 2
-        setLevel(3);
-        return 0;
-      } else if (level === 3 && newCount >= 6) {  // Even more at level 3
-        setLevel(4);
-        return 0;
-      } else if (level >= 4 && newCount >= 8) {  // Keep increasing difficulty
-        setLevel(l => l + 1);
-        return 0;
-      }
-      return newCount;
-    });
-  }, [level]);
+  // Check for matches
+  useEffect(() => {
+    if (selectedProblem && selectedAnswer) {
+      const isCorrect = selectedProblem.result === selectedAnswer.value;
 
-  const checkMatch = useCallback(() => {
-    if (!selectedProblem || !selectedAnswer) return;
+      if (isCorrect) {
+        playSuccessSound();
+        setScore(prev => prev + (100 * multiplier));
+        setStreak(prev => {
+          const newStreak = prev + 1;
+          if (newStreak % 5 === 0) {
+            setMultiplier(prev => Math.min(prev + 0.5, 4));
+            setShowStreakAnimation(true);
+            setTimeout(() => setShowStreakAnimation(false), 2000);
+            playStreakSound();
+            createCelebration();
+          }
+          return newStreak;
+        });
 
-    const isMatch = selectedProblem.sum === selectedAnswer.value;
+        // Create particles at both the problem and answer locations
+        const problemElement = document.querySelector(`[data-id="${selectedProblem.id}"]`);
+        const answerElement = document.querySelector(`[data-id="${selectedAnswer.id}"]`);
 
-    if (isMatch) {
-      // Update streak and check level progress
-      checkLevelProgress();
-      
-      setStreak(prev => {
-        const newStreak = prev + 1;
-        if (newStreak > 0 && newStreak % 3 === 0) {
-          setShowStreakAnimation(true);
-          setTimeout(() => setShowStreakAnimation(false), 2000);
-          playStreakSound();
-        } else {
-          playSuccessSound();
+        if (problemElement && answerElement) {
+          const problemRect = problemElement.getBoundingClientRect();
+          const answerRect = answerElement.getBoundingClientRect();
+
+          createParticles(
+            problemRect.left + problemRect.width / 2,
+            problemRect.top + problemRect.height / 2
+          );
+          createParticles(
+            answerRect.left + answerRect.width / 2,
+            answerRect.top + answerRect.height / 2
+          );
         }
-        return newStreak;
-      });
 
-      setScore(prevScore => {
-        const newScore = prevScore + 1;
-        if (newScore > highScore) {
-          setHighScore(newScore);
-          localStorage.setItem('numberBondsHighScore', newScore.toString());
+        // Remove matched pair with animation
+        removeItems(selectedProblem.id, selectedAnswer.id);
+
+        // Generate new problems if needed
+        if (problems.length <= 1) {
+          setTimeout(generateProblemsAndAnswers, 500);
         }
-        return newScore;
-      });
-
-      const problemElement = document.querySelector(`[data-id="${selectedProblem.id}"]`);
-      const answerElement = document.querySelector(`[data-id="${selectedAnswer.id}"]`);
-
-      if (problemElement && answerElement) {
-        const problemRect = problemElement.getBoundingClientRect();
-        const answerRect = answerElement.getBoundingClientRect();
-
-        createParticles(problemRect.left + problemRect.width / 2, problemRect.top + problemRect.height / 2);
-        createParticles(answerRect.left + answerRect.width / 2, answerRect.top + answerRect.height / 2);
+      } else {
+        playWrongSound();
+        setStreak(0);
+        setMultiplier(1);
       }
 
-      removeItems(selectedProblem.id, selectedAnswer.id);
-      setSelectedProblem(null);
-      setSelectedAnswer(null);
-
-      // Generate new problems if we're running low
-      if (problems.length <= 2) {
-        generateProblemsAndAnswers();
-      }
-    } else {
-      setStreak(0);
-      // On wrong answer at higher levels, consider dropping back a level
-      if (level > 3 && Math.random() < 0.3) {  // 30% chance to drop back
-        setLevel(prev => prev - 1);
-        setSuccessCount(0);
-        generateProblemsAndAnswers();
-      }
-      playSound(280, 'sawtooth');
       setSelectedProblem(null);
       setSelectedAnswer(null);
     }
-  }, [selectedProblem, selectedAnswer, highScore, removeItems, problems.length, level, checkLevelProgress]);
-
-  useEffect(() => {
-    checkMatch();
-  }, [selectedProblem, selectedAnswer, checkMatch]);
-
-  useEffect(() => {
-    generateProblemsAndAnswers();
-  }, [level]);
-
-  const isRemoving = (id) => removingItems.has(id);
-
-  const RainbowText = ({ text }) => {
-    const colors = ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#8F00FF'];
-    return (
-      <div className="flex justify-center items-center gap-1">
-        {text.split('').map((letter, index) => (
-          <span
-            key={index}
-            className="text-6xl font-bold animate-bounce"
-            style={{
-              color: colors[index % colors.length],
-              textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-              animationDelay: `${index * 0.1}s`
-            }}
-          >
-            {letter}
-          </span>
-        ))}
-      </div>
-    );
-  };
+  }, [selectedProblem, selectedAnswer, problems.length, multiplier, 
+      playSuccessSound, playWrongSound, playStreakSound, generateProblemsAndAnswers, removeItems]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <RainbowText text="BLAKES" />
-          <div className="text-2xl text-center text-white font-bold mt-2">
-            Number Bonds Game!
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 p-4">
+      {showLevelUp && (
+        <div className="level-up-text">
+          Level Up! 🎉
         </div>
-        
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-white text-xl">
-            Score: {score}
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center text-white text-xl">
-              <Crown className="w-6 h-6 mr-2 text-yellow-300" />
-              High Score: {highScore}
-            </div>
-            <div className="text-white text-xl">
-              Level: {level}
-            </div>
-            {streak > 0 && (
-              <div className={`text-xl font-bold ${showStreakAnimation ? 'animate-bounce text-yellow-300' : 'text-white'}`}>
-                Streak: {streak}! 🔥
-              </div>
+      )}
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="rainbow-text text-4xl mb-2">Number Bonds</h1>
+            {playerName && (
+              <p className="text-primary-700 text-xl animate-wiggle">
+                Hello, {playerName}!
+              </p>
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <Volume2 
-              className="w-6 h-6 text-white cursor-pointer hover:text-yellow-300 transition-colors" 
-              onClick={() => playSound(440)} 
-            />
+          <div className="flex gap-2">
             <button
-              onClick={resetGame}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+              onClick={() => setShowSettings(true)}
+              className="kid-button !p-2"
+              aria-label="Settings"
             >
-              <RotateCw className="w-5 h-5" />
-              Reset
+              <Settings className="w-6 h-6" />
+            </button>
+            <button
+              onClick={generateProblemsAndAnswers}
+              className="kid-button !p-2"
+              aria-label="New Problems"
+            >
+              <RotateCw className="w-6 h-6" />
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white/20 p-4 rounded-lg backdrop-blur-lg">
-            <h2 className="text-xl font-semibold text-white mb-4 sticky top-0 bg-white/10 p-2 rounded">
-              Number Pairs
-            </h2>
-            <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <div className="grid-container">
+        {/* Score Display */}
+        <div className="text-center mb-6">
+          <div className="rainbow-text text-6xl mb-2">{score}</div>
+          {multiplier > 1 && (
+            <div className="multiplier-badge">
+              {multiplier}x Multiplier!
+            </div>
+          )}
+          {streak > 0 && (
+            <div className={`streak-badge mt-2 ${showStreakAnimation ? 'animate-bounce' : ''}`}>
+              🔥 {streak} Streak! 🔥
+            </div>
+          )}
+        </div>
+
+        {/* Game Board */}
+        <div className="kid-panel">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Problems */}
+            <div>
+              <h2 className="rainbow-text text-2xl mb-4">Problems</h2>
+              <div className="space-y-3">
                 {problems.map((problem) => (
                   <button
                     key={problem.id}
                     data-id={problem.id}
-                    className={`grid-item p-4 rounded-lg text-3xl font-bold transition-all transform hover:scale-105
-                      ${isRemoving(problem.id) ? 'animate-disappear' : ''}
-                      ${selectedProblem?.id === problem.id 
-                        ? 'bg-indigo-600 text-white shadow-lg scale-105' 
-                        : 'bg-white text-indigo-600 hover:bg-indigo-50'}`}
-                    onClick={() => !isRemoving(problem.id) && handleSelection(problem, 'problem')}
-                    disabled={isRemoving(problem.id)}
+                    onClick={() => handleProblemClick(problem)}
+                    className={`kid-card w-full ${
+                      removingItems.has(problem.id) ? 'animate-disappear' : ''
+                    } ${
+                      selectedProblem?.id === problem.id ? 'selected' : ''
+                    }`}
+                    disabled={removingItems.has(problem.id)}
                   >
-                    {problem.first} + {problem.second}
+                    {problem.parts.join(` ${problem.operation} `)}
                   </button>
                 ))}
               </div>
             </div>
-          </div>
 
-          <div className="bg-white/20 p-4 rounded-lg backdrop-blur-lg">
-            <h2 className="text-xl font-semibold text-white mb-4 sticky top-0 bg-white/10 p-2 rounded">
-              Makes What?
-            </h2>
-            <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <div className="grid-container">
+            {/* Answers */}
+            <div>
+              <h2 className="rainbow-text text-2xl mb-4">Answers</h2>
+              <div className="space-y-3">
                 {answers.map((answer) => (
                   <button
                     key={answer.id}
                     data-id={answer.id}
-                    className={`grid-item p-4 rounded-lg text-4xl font-bold transition-all transform hover:scale-105
-                      ${isRemoving(answer.id) ? 'animate-disappear' : ''}
-                      ${selectedAnswer?.id === answer.id 
-                        ? 'bg-purple-600 text-white shadow-lg scale-105' 
-                        : 'bg-white text-purple-600 hover:bg-purple-50'}`}
-                    onClick={() => !isRemoving(answer.id) && handleSelection(answer, 'answer')}
-                    disabled={isRemoving(answer.id)}
+                    onClick={() => handleAnswerClick(answer)}
+                    className={`kid-card w-full ${
+                      removingItems.has(answer.id) ? 'animate-disappear' : ''
+                    } ${
+                      selectedAnswer?.id === answer.id ? 'selected' : ''
+                    }`}
+                    disabled={removingItems.has(answer.id)}
                   >
                     {answer.value}
                   </button>
@@ -459,6 +529,29 @@ const NumberBondsGame = () => {
             </div>
           </div>
         </div>
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <SettingsPanel
+            onClose={() => setShowSettings(false)}
+            playerName={playerName}
+            setPlayerName={setPlayerName}
+            gameSettings={gameSettings}
+            setGameSettings={setGameSettings}
+            generateProblemsAndAnswers={generateProblemsAndAnswers}
+          />
+        )}
+        {showIntroModal && (
+          <SettingsPanel
+            onClose={() => setShowIntroModal(false)}
+            isIntro
+            playerName={playerName}
+            setPlayerName={setPlayerName}
+            gameSettings={gameSettings}
+            setGameSettings={setGameSettings}
+            generateProblemsAndAnswers={generateProblemsAndAnswers}
+          />
+        )}
       </div>
     </div>
   );
