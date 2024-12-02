@@ -78,32 +78,59 @@ const SettingsPanel = React.memo(({
       settings: {
         ...prev.settings,
         minNumber: preset.min,
-        maxNumber: preset.max
+        maxNumber: preset.max,
+        problemCount: preset.problemCount
       }
     }));
     setError('');
   }, []);
 
-  const handleOperationChange = React.useCallback((operation) => {
-    setFormData(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        operationType: operation
+  const handleOperationToggle = React.useCallback((operation, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFormData(prev => {
+      const currentOps = prev.settings.enabledOperations || ['addition'];
+      let newOps;
+      
+      if (currentOps.includes(operation)) {
+        // Don't allow removing the last operation
+        if (currentOps.length === 1) return prev;
+        newOps = currentOps.filter(op => op !== operation);
+      } else {
+        newOps = [...currentOps, operation];
+        // If division is enabled, force variableCount to 2
+        if (operation === 'division') {
+          return {
+            ...prev,
+            settings: {
+              ...prev.settings,
+              enabledOperations: newOps,
+              variableCount: 2
+            }
+          };
+        }
       }
-    }));
+      
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          enabledOperations: newOps
+        }
+      };
+    });
   }, []);
 
-  const handleProblemCountChange = React.useCallback((e) => {
+  const handleVariableCountChange = React.useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     const count = parseInt(e.target.value);
-    if (!isNaN(count) && count >= 2 && count <= 8) {
+    if (!isNaN(count) && count >= 2 && count <= 5) {
       setFormData(prev => ({
         ...prev,
         settings: {
           ...prev.settings,
-          problemCount: count
+          variableCount: count
         }
       }));
     }
@@ -127,9 +154,16 @@ const SettingsPanel = React.memo(({
       setPlayerName(trimmedName);
       setGameSettings(formData.settings);
       localStorage.setItem('playerName', trimmedName);
+      
+      // Properly store enabledOperations as JSON
       Object.entries(formData.settings).forEach(([key, value]) => {
-        localStorage.setItem(key, value.toString());
+        if (key === 'enabledOperations') {
+          localStorage.setItem(key, JSON.stringify(value));
+        } else {
+          localStorage.setItem(key, value.toString());
+        }
       });
+      
       onClose();
       generateProblemsAndAnswers();
     }
@@ -149,11 +183,11 @@ const SettingsPanel = React.memo(({
 
   // Memoized difficulty presets
   const difficultyPresets = React.useMemo(() => [
-    { name: 'Beginner', min: 1, max: 5, emoji: '🌱' },
-    { name: 'Easy', min: 1, max: 10, emoji: '🌟' },
-    { name: 'Medium', min: 5, max: 15, emoji: '🚀' },
-    { name: 'Hard', min: 10, max: 20, emoji: '🔥' },
-    { name: 'Expert', min: 15, max: 30, emoji: '👑' }
+    { name: 'Beginner', min: 1, max: 5, problemCount: 3, emoji: '🌱' },
+    { name: 'Easy', min: 1, max: 10, problemCount: 4, emoji: '🌟' },
+    { name: 'Medium', min: 5, max: 15, problemCount: 5, emoji: '🚀' },
+    { name: 'Hard', min: 10, max: 20, problemCount: 6, emoji: '🔥' },
+    { name: 'Expert', min: 15, max: 30, problemCount: 8, emoji: '👑' }
   ], []);
 
   return (
@@ -229,15 +263,20 @@ const SettingsPanel = React.memo(({
                     key={preset.name}
                     onClick={(e) => handleDifficultySelect(preset, e)}
                     className={`p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center
-                      ${formData.settings.minNumber === preset.min && formData.settings.maxNumber === preset.max
+                      ${formData.settings.minNumber === preset.min && 
+                        formData.settings.maxNumber === preset.max &&
+                        formData.settings.problemCount === preset.problemCount
                         ? 'border-primary-500 bg-primary-50 text-primary-700'
                         : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/50'}`}
                   >
                     <span className="text-xl sm:text-2xl mr-3">{preset.emoji}</span>
-                    <div className="text-left">
+                    <div className="text-left flex-grow">
                       <div className="font-medium text-sm sm:text-base">{preset.name}</div>
                       <div className="text-xs sm:text-sm text-gray-500">
-                        Numbers from {preset.min} to {preset.max}
+                        Numbers: {preset.min} to {preset.max}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-500">
+                        Problems: {preset.problemCount} at a time
                       </div>
                     </div>
                   </button>
@@ -248,46 +287,78 @@ const SettingsPanel = React.memo(({
 
           {activeTab === 'customize' && (
             <div className="space-y-6">
-              {/* Operation Type */}
+              {/* Operations */}
               <div>
-                <label className="text-gray-700 font-medium">Operation</label>
+                <label className="text-gray-700 font-medium mb-2 block">Operations</label>
                 <div className="grid grid-cols-2 gap-3 mt-2">
                   {[
                     { value: 'addition', label: 'Addition', emoji: '➕' },
-                    { value: 'multiplication', label: 'Multiplication', emoji: '✖️' }
+                    { value: 'subtraction', label: 'Subtraction', emoji: '➖' },
+                    { value: 'multiplication', label: 'Multiplication', emoji: '✖️' },
+                    { value: 'division', label: 'Division', emoji: '➗' }
                   ].map(op => (
                     <button
                       key={op.value}
-                      onClick={(e) => handleOperationChange(op.value, e)}
-                      className={`p-3 rounded-xl border-2 transition-all text-center
-                        ${formData.settings.operationType === op.value
+                      onClick={(e) => handleOperationToggle(op.value, e)}
+                      className={`p-3 rounded-xl border-2 transition-all text-center relative
+                        ${(formData.settings.enabledOperations || ['addition']).includes(op.value)
                           ? 'border-primary-500 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/50'}`}
+                          : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/50 text-gray-500'}`}
                     >
                       <div className="text-xl sm:text-2xl mb-1">{op.emoji}</div>
                       <div className="font-medium text-sm sm:text-base">{op.label}</div>
+                      {(formData.settings.enabledOperations || ['addition']).includes(op.value) && (
+                        <div className="absolute top-2 right-2 w-3 h-3 bg-primary-500 rounded-full" />
+                      )}
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Select multiple operations to mix them together.
+                  {(formData.settings.enabledOperations || []).includes('division') && 
+                    ' Division problems will always use 2 variables.'}
+                </p>
               </div>
 
-              {/* Problem Count */}
+              {/* Variable Count */}
               <div>
                 <label className="text-gray-700 font-medium">
-                  Number of Problems: {formData.settings.problemCount}
+                  Variables per Problem: {formData.settings.variableCount || 2}
                 </label>
                 <input
                   type="range"
                   min="2"
-                  max="8"
+                  max="5"
                   step="1"
-                  value={formData.settings.problemCount}
-                  onChange={handleProblemCountChange}
-                  className="w-full mt-2 accent-primary-500 cursor-pointer"
+                  value={formData.settings.variableCount || 2}
+                  onChange={handleVariableCountChange}
+                  disabled={(formData.settings.enabledOperations || []).includes('division')}
+                  className={`w-full mt-2 cursor-pointer ${
+                    (formData.settings.enabledOperations || []).includes('division')
+                      ? 'opacity-50'
+                      : 'accent-primary-500'
+                  }`}
                 />
                 <div className="flex justify-between text-sm text-gray-500 mt-1">
                   <span>2</span>
-                  <span>8</span>
+                  <span>5</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {(formData.settings.enabledOperations || []).includes('division')
+                    ? 'Division problems always use 2 variables'
+                    : 'Example: 3 variables would be like "2 + 3 + 4 = 9"'}
+                </p>
+              </div>
+
+              {/* Current Difficulty Info */}
+              <div className="mt-4 p-3 bg-gray-50 rounded-xl">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Current Settings</h3>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <p>Number Range: {formData.settings.minNumber} to {formData.settings.maxNumber}</p>
+                  <p>Problems Shown: {formData.settings.problemCount}</p>
+                  <p>Operations: {(formData.settings.enabledOperations || ['addition'])
+                    .map(op => op.charAt(0).toUpperCase() + op.slice(1))
+                    .join(', ')}</p>
                 </div>
               </div>
             </div>
@@ -334,7 +405,16 @@ const NumberBondsGame = () => {
     minNumber: parseInt(localStorage.getItem('minNumber')) || 1,
     maxNumber: parseInt(localStorage.getItem('maxNumber')) || 10,
     problemCount: parseInt(localStorage.getItem('problemCount')) || 4,
-    operationType: localStorage.getItem('operationType') || 'addition',
+    enabledOperations: (() => {
+      try {
+        const saved = localStorage.getItem('enabledOperations');
+        return saved ? JSON.parse(saved) : ['addition'];
+      } catch (e) {
+        console.warn('Error parsing enabledOperations from localStorage:', e);
+        return ['addition'];
+      }
+    })(),
+    variableCount: parseInt(localStorage.getItem('variableCount')) || 2
   });
 
   // UI state
@@ -362,7 +442,7 @@ const NumberBondsGame = () => {
     fastSolves: 0,
     playTime: 0,
     maxStreak: 0,
-    operationsUsed: new Set([gameSettings.operationType])
+    operationsUsed: new Set([gameSettings.enabledOperations])
   }));
 
   const createParticles = (x, y, isStreak = false) => {
@@ -396,17 +476,54 @@ const NumberBondsGame = () => {
 
   // Generate problems based on operation type
   const generateProblem = useCallback(() => {
-    const { minNumber, maxNumber, operationType } = gameSettings;
+    const { minNumber, maxNumber, variableCount = 2, enabledOperations = ['addition'] } = gameSettings;
     
-    if (operationType === 'addition') {
-      const sum = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
-      const part1 = Math.floor(Math.random() * (sum - minNumber)) + minNumber;
-      const part2 = sum - part1;
-      return { parts: [part1, part2], result: sum, operation: '+' };
-    } else { // multiplication
-      const num1 = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
-      const num2 = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
-      return { parts: [num1, num2], result: num1 * num2, operation: '×' };
+    const generateNumber = () => Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
+    
+    // Randomly select one of the enabled operations
+    const operationType = enabledOperations[Math.floor(Math.random() * enabledOperations.length)];
+    
+    switch (operationType) {
+      case 'addition': {
+        const result = generateNumber();
+        const parts = [];
+        let remaining = result;
+        
+        for (let i = 0; i < variableCount - 1; i++) {
+          const part = i === variableCount - 2 
+            ? remaining 
+            : Math.floor(Math.random() * (remaining - minNumber)) + minNumber;
+          parts.push(part);
+          remaining -= part;
+        }
+        parts.push(remaining);
+        return { parts, result, operation: '+' };
+      }
+      
+      case 'subtraction': {
+        const firstNumber = generateNumber();
+        const parts = [firstNumber];
+        for (let i = 1; i < variableCount; i++) {
+          parts.push(generateNumber());
+        }
+        const result = parts.reduce((a, b) => a - b);
+        return { parts, result, operation: '-' };
+      }
+      
+      case 'multiplication': {
+        const parts = Array(variableCount).fill(0).map(generateNumber);
+        const result = parts.reduce((a, b) => a * b);
+        return { parts, result, operation: '×' };
+      }
+      
+      case 'division': {
+        const result = generateNumber();
+        const firstNumber = result * generateNumber();
+        return { parts: [firstNumber, result], result: firstNumber / result, operation: '÷' };
+      }
+      
+      default:
+        return { parts: [0, 0], result: 0, operation: '+' };
     }
   }, [gameSettings]);
 
@@ -416,8 +533,10 @@ const NumberBondsGame = () => {
     const answersSet = new Set();
     const { problemCount } = gameSettings;
 
+    // Keep generating problems until we have the desired number
     while (newProblems.length < problemCount) {
       const problem = generateProblem();
+      // Only add the problem if its answer isn't already used
       if (!answersSet.has(problem.result)) {
         newProblems.push({
           id: Math.random().toString(36).substr(2, 9),
@@ -601,11 +720,11 @@ const NumberBondsGame = () => {
         ...prev,
         level: Math.floor(streak / 5) + 1,
         maxStreak: Math.max(prev.maxStreak, streak),
-        operationsUsed: new Set([...prev.operationsUsed, gameSettings.operationType])
+        operationsUsed: new Set([...prev.operationsUsed, gameSettings.enabledOperations])
       };
       return newStats;
     });
-  }, [streak, gameSettings.operationType]);
+  }, [streak, gameSettings.enabledOperations]);
 
   // Check badges when stats change
   useEffect(() => {
